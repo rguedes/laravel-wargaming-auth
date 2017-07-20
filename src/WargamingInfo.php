@@ -7,11 +7,14 @@ class WargamingInfo extends Fluent
 
     public function __construct($data)
     {
-        $wargamingidID = isset($data['wargamingid']) ? $data['wargamingid'] : null;
+        $wargamingidID = isset($data['account_id']) ? $data['account_id'] : null;
+        $wargamingidToken = isset($data['wargamingtoken']) ? $data['wargamingtoken'] : null;
         unset($data['wargamingid']);
+        unset($data['wargamingtoken']);
 
         parent::__construct($data);
 
         $this->attributes['wargamingid'] = $wargamingidID;
+        $this->attributes['wargamingtoken'] = $wargamingidToken;
     }
 }

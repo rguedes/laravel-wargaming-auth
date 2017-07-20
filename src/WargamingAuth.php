@@ -5,6 +5,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Support\Fluent;
+use Illuminate\Support\Facades\Cookie;
 
 class WargamingAuth implements WargamingAuthInterface
 {
@@ -13,6 +14,11 @@ class WargamingAuth implements WargamingAuthInterface
      * @var integer|null
      */
     public $wargamingId = null;
+
+    /**
+     * @var integer|null
+     */
+    public $wargamingToken = null;
 
     /**
      * @var WargamingInfo
@@ -42,7 +48,7 @@ class WargamingAuth implements WargamingAuthInterface
     /**
      * @var string
      */
-    const WARGAMING_INFO_URL = 'https://api.worldoftanks.eu/wgn/account/info/?application_id=%s&account_id=%s';
+    const WARGAMING_INFO_URL = 'https://api.worldoftanks.eu/wgn/account/info/?application_id=%s&account_id=%s&access_token=%s';
 
     /**
      * Create a new WargamingAuth instance
@@ -52,8 +58,8 @@ class WargamingAuth implements WargamingAuthInterface
     public function __construct(Request $request)
     {
         $this->request = $request;
-        $this->authUrl = $this->buildUrl(url(Config::get('wargaming-auth.redirect_url'), [],
-            Config::get('wargaming-auth.https')));
+        $this->loadWargamingID();
+        $this->authUrl = $this->buildUrl(url(Config::get('wargaming-auth.redirect_url'), [], Config::get('wargaming-auth.https')));
         $this->guzzleClient  = new GuzzleClient;
     }
 
@@ -64,9 +70,7 @@ class WargamingAuth implements WargamingAuthInterface
      */
     private function requestIsValid()
     {
-        return $this->request->has('openid_assoc_handle')
-               && $this->request->has('openid_signed')
-               && $this->request->has('openid_sig');
+        return $this->request->has('application_id');
     }
 
     /**
@@ -77,22 +81,15 @@ class WargamingAuth implements WargamingAuthInterface
      */
     public function validate($parseInfo = true)
     {
-        if (!$this->requestIsValid()) {
+        if (!$this->requestIsValid() || is_null($this->wargamingId) || is_null($this->wargamingToken)) {
             return false;
         }
 
-        $params = $this->getParams();
+        $response = $this->guzzleClient->get(sprintf(self::WARGAMING_INFO_URL, Config::get('wargaming-auth.api_key'), $this->wargamingId, $this->wargamingToken));
 
-        $response = $this->guzzleClient->request('POST', self::OPENID_URL, [
-            'form_params' => $params
-        ]);
+        $results = $this->parseResults($response->getBody());
 
-        $results = $this->parseResults($response->getBody()->getContents());
-
-        $this->parseWargamingID();
-        if ($parseInfo) $this->parseInfo();
-
-        return $results->is_valid == "true";
+        return !is_null($results->private);
     }
 
     /**
@@ -103,31 +100,27 @@ class WargamingAuth implements WargamingAuthInterface
     public function getParams()
     {
         $params = [
-            'openid.assoc_handle' => $this->request->get('openid_assoc_handle'),
-            'openid.signed'       => $this->request->get('openid_signed'),
-            'openid.sig'          => $this->request->get('openid_sig'),
-            'openid.ns'           => 'http://specs.openid.net/auth/2.0',
-            'openid.mode'         => 'check_authentication'
+            'application_id' => Config::get('wargaming-auth.api_key'),
+            'access_token' => '',
+            'account_id' => $this->getWargamingId()
         ];
-
-        $signedParams = explode(',', $this->request->get('openid_signed'));
-
-        foreach ($signedParams as $item) {
-            $value = $this->request->get('openid_' . str_replace('.', '_', $item));
-            $params['openid.' . $item] = get_magic_quotes_gpc() ? stripslashes($value) : $value;
-        }
-
         return $params;
     }
 
     /**
      * Parse openID reponse to fluent object
      *
-     * @param  string $results openid reponse body
+     * @param  string $results wg reponse body
      * @return Fluent
      */
     public function parseResults($results)
     {
+        $results = json_decode($results, true);
+
+
+        return $results['data'][$this->wargamingId];
+
+
         $parsed = [];
         $lines = explode("\n", $results);
 
@@ -174,12 +167,8 @@ class WargamingAuth implements WargamingAuthInterface
         }
 
         $params = array(
-            'openid.ns'         => 'http://specs.openid.net/auth/2.0',
-            'openid.mode'       => 'checkid_setup',
-            'openid.return_to'  => $return,
-            'openid.realm'      => (Config::get('wargaming-auth.https') ? 'https' : 'http') . '://' . $this->request->server('HTTP_HOST'),
-            'openid.identity'   => 'http://specs.openid.net/auth/2.0/identifier_select',
-            'openid.claimed_id' => 'http://specs.openid.net/auth/2.0/identifier_select',
+            'application_id' => Config::get('wargaming-auth.api_key'),
+            'return_uri'     => $return
         );
 
         return self::OPENID_URL . '?' . http_build_query($params, '', '&');
@@ -200,12 +189,10 @@ class WargamingAuth implements WargamingAuthInterface
      *
      * @return void
      */
-    public function parseWargamingID()
+    public function loadWargamingID()
     {
-        //https://api.worldoftanks.eu/wot/auth/login/?application_id=0b32e06aa1d2e132f0ca7ad6b5faa3d7
-        //https://api.worldoftanks.eu/id/508431014-ptCode/confirm/?redirect_uri=https%3A%2F%2Fdevelopers.wargaming.net%2Freference%2Fall%2Fwot%2Fauth%2Flogin%2F&language=en
-        preg_match("#^http://api.worldoftanks.eu/id/([0-9]{9})#", $this->request->get('openid_claimed_id'), $matches);
-        $this->wargamingId = is_numeric($matches[1]) ? $matches[1] : 0;
+        $this->wargamingId = Cookie::get('wargamingId', null);
+        $this->wargamingToken = Cookie::get('wargamingToken', null);
     }
 
     /**
@@ -213,14 +200,10 @@ class WargamingAuth implements WargamingAuthInterface
      *
      * @return void
      */
-    public function parseInfo()
+    public function parseInfo($info)
     {
-        if (is_null($this->wargamingId)) return;
-
-        $reponse = $this->guzzleClient->request('GET', sprintf(self::WARGAMING_INFO_URL, Config::get('wargaming-auth.api_key'), $this->wargamingId));
-        $json = json_decode($reponse->getBody(), true);
-
-        $this->wargamingInfo = new WargamingInfo($json["data"][$this->wargamingId]);
+        if (is_null($info)) return;
+        $this->wargamingInfo = new WargamingInfo($info);
     }
 
     /**
@@ -251,6 +234,16 @@ class WargamingAuth implements WargamingAuthInterface
     public function getWargamingId()
     {
         return $this->wargamingId;
+    }
+
+    /**
+     * Returns the wargaming token
+     *
+     * @return bool|string
+     */
+    public function getWargamingToken()
+    {
+        return $this->wargamingToken;
     }
 
 }

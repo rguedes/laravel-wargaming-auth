@@ -7,5 +7,6 @@ interface WargamingAuthInterface
     public function validate();
     public function getAuthUrl();
     public function getWargamingId();
+    public function getWargamingToken();
     public function getUserInfo();
 }
