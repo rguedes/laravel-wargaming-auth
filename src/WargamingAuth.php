@@ -24,6 +24,11 @@ class WargamingAuth implements WargamingAuthInterface
      * @var WargamingInfo
      */
     public $wargamingInfo = null;
+    
+    /**
+     * @var WargamingLogin
+     */
+    public $wargamingLogin = null;
 
     /**
      * @var string
@@ -214,6 +219,7 @@ class WargamingAuth implements WargamingAuthInterface
             session(['wargamingToken'=>$info['access_token']]);
             $this->wargamingId = $info['account_id'];
             $this->wargamingToken = $info['access_token'];
+            $this->wargamingLogin = $info;
         }
     }
 
