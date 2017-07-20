@@ -81,15 +81,21 @@ class WargamingAuth implements WargamingAuthInterface
      */
     public function validate($parseInfo = true)
     {
-        if (!$this->requestIsValid() || is_null($this->wargamingId) || is_null($this->wargamingToken)) {
+        $this->loadWargamingID();
+        if (is_null($this->wargamingId) || is_null($this->wargamingToken)) {
             return false;
         }
 
         $response = $this->guzzleClient->get(sprintf(self::WARGAMING_INFO_URL, Config::get('wargaming-auth.api_key'), $this->wargamingId, $this->wargamingToken));
 
         $results = $this->parseResults($response->getBody());
+        return is_array($results) && !is_null($results['private']);
+    }
 
-        return !is_null($results->private);
+    public function loadWargamingInfo(){
+        if($this->validate()){
+            return $this->getUserInfo();
+        }
     }
 
     /**
@@ -116,8 +122,7 @@ class WargamingAuth implements WargamingAuthInterface
     public function parseResults($results)
     {
         $results = json_decode($results, true);
-
-
+        $this->wargamingInfo = $results['data'][$this->wargamingId];
         return $results['data'][$this->wargamingId];
 
 
@@ -168,7 +173,7 @@ class WargamingAuth implements WargamingAuthInterface
 
         $params = array(
             'application_id' => Config::get('wargaming-auth.api_key'),
-            'return_uri'     => $return
+            'redirect_uri'     => $return
         );
 
         return self::OPENID_URL . '?' . http_build_query($params, '', '&');
@@ -191,8 +196,8 @@ class WargamingAuth implements WargamingAuthInterface
      */
     public function loadWargamingID()
     {
-        $this->wargamingId = Cookie::get('wargamingId', null);
-        $this->wargamingToken = Cookie::get('wargamingToken', null);
+        $this->wargamingId = session('wargamingId', null);
+        $this->wargamingToken = session('wargamingToken', null);
     }
 
     /**
@@ -203,7 +208,13 @@ class WargamingAuth implements WargamingAuthInterface
     public function parseInfo($info)
     {
         if (is_null($info)) return;
-        $this->wargamingInfo = new WargamingInfo($info);
+
+        if($info['status']=="ok"){
+            session(['wargamingId'=>$info['account_id']]);
+            session(['wargamingToken'=>$info['access_token']]);
+            $this->wargamingId = $info['account_id'];
+            $this->wargamingToken = $info['access_token'];
+        }
     }
 
     /**
