@@ -24,7 +24,7 @@ class WargamingAuth implements WargamingAuthInterface
      * @var WargamingInfo
      */
     public $wargamingInfo = null;
-    
+
     /**
      * @var WargamingLogin
      */
@@ -53,7 +53,12 @@ class WargamingAuth implements WargamingAuthInterface
     /**
      * @var string
      */
-    const WARGAMING_INFO_URL = 'https://api.worldoftanks.eu/wgn/account/info/?application_id=%s&account_id=%s&access_token=%s';
+    const WARGAMING_INFO_URL = 'https://api.worldoftanks.eu/wot/account/info/?application_id=%s&account_id=%s&access_token=%s';
+
+    /**
+     * @var string
+     */
+    const WARGAMING_CLAN_INFO_URL = 'https://api.worldoftanks.eu/wgn/clans/membersinfo/?application_id=%s&account_id=%s';
 
     /**
      * Create a new WargamingAuth instance
@@ -86,15 +91,33 @@ class WargamingAuth implements WargamingAuthInterface
      */
     public function validate($parseInfo = true)
     {
+        $results = $this->getWargamingUserInfo();
+
+        return is_array($results) && !is_null($results['private']);
+    }
+
+    public function getWargamingUserInfo(){
         $this->loadWargamingID();
+
         if (is_null($this->wargamingId) || is_null($this->wargamingToken)) {
             return false;
         }
 
         $response = $this->guzzleClient->get(sprintf(self::WARGAMING_INFO_URL, Config::get('wargaming-auth.api_key'), $this->wargamingId, $this->wargamingToken));
+        return $this->parseResults($response->getBody());
+    }
 
-        $results = $this->parseResults($response->getBody());
-        return is_array($results) && !is_null($results['private']);
+    public function getWargamingUserClanInfo()
+    {
+
+        $this->loadWargamingID();
+
+        if (is_null($this->wargamingId)) {
+            return false;
+        }
+
+        $response = $this->guzzleClient->get(sprintf(self::WARGAMING_CLAN_INFO_URL, Config::get('wargaming-auth.api_key'), $this->wargamingId));
+        return $this->parseResults($response->getBody());
     }
 
     public function loadWargamingInfo(){
@@ -197,12 +220,13 @@ class WargamingAuth implements WargamingAuthInterface
     /**
      * Parse the wargamingID from the OpenID response
      *
-     * @return void
+     * @return WargamingAuth
      */
     public function loadWargamingID()
     {
         $this->wargamingId = session('wargamingId', null);
         $this->wargamingToken = session('wargamingToken', null);
+        return $this;
     }
 
     /**
