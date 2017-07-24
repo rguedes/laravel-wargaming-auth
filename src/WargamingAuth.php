@@ -24,7 +24,7 @@ class WargamingAuth implements WargamingAuthInterface
      * @var WargamingInfo
      */
     public $wargamingInfo = null;
-
+    
     /**
      * @var WargamingLogin
      */
@@ -239,10 +239,8 @@ class WargamingAuth implements WargamingAuthInterface
         if (is_null($info)) return;
 
         if($info['status']=="ok"){
-            session(['wargamingId'=>$info['account_id']]);
-            session(['wargamingToken'=>$info['access_token']]);
-            $this->wargamingId = $info['account_id'];
-            $this->wargamingToken = $info['access_token'];
+            $this->setWargamingId($info['account_id']);
+            $this->setWargamingToken($info['access_token']);
             $this->wargamingLogin = $info;
         }
     }
@@ -277,6 +275,19 @@ class WargamingAuth implements WargamingAuthInterface
         return $this->wargamingId;
     }
 
+
+    /**
+     * Sets the wargaming id
+     *
+     * @return WargamingAuth
+     */
+    public function setWargamingId($id)
+    {
+        session(['wargamingId'=>$id]);
+        $this->wargamingId = $id;
+        return $this;
+    }
+
     /**
      * Returns the wargaming token
      *
@@ -285,6 +296,18 @@ class WargamingAuth implements WargamingAuthInterface
     public function getWargamingToken()
     {
         return $this->wargamingToken;
+    }
+
+    /**
+     * Set the wargaming token
+     *
+     * @return WargamingAuth
+     */
+    public function setWargamingToken($token)
+    {
+        $this->wargamingToken= $token;
+        session(['wargamingToken'=>$token]);
+        return $this;
     }
 
 }
