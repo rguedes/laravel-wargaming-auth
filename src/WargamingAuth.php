@@ -116,8 +116,7 @@ class WargamingAuth implements WargamingAuthInterface
         if (is_null($this->getWargamingId()) || is_null($this->getWargamingToken())) {
             return false;
         }
-
-        $response = $this->guzzleClient->get(sprintf(self::WARGAMING_INFO_URL, Config::get('wargaming-auth.api_key'), $this->wargamingId, $this->wargamingToken));
+        $response = $this->guzzleClient->get(sprintf(self::WARGAMING_INFO_URL, Config::get('wargaming-auth.api_key'), $this->getWargamingId(), $this->getWargamingToken()));
         return $this->parseResults($response->getBody());
     }
 
@@ -267,7 +266,7 @@ class WargamingAuth implements WargamingAuthInterface
     /**
      * Get user data from wargaming api
      *
-     * @return void
+     * @return void | Redirector
      */
     public function parseInfo($info)
     {
@@ -278,6 +277,8 @@ class WargamingAuth implements WargamingAuthInterface
             $this->setWargamingToken($info['access_token']);
             $this->setExpirateDate($info['expires_at']);
             $this->wargamingLogin = $info;
+        }else{
+            return $this->redirect();
         }
     }
 
