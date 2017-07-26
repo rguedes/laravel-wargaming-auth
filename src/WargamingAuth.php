@@ -4,8 +4,6 @@ use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use GuzzleHttp\Client as GuzzleClient;
-use Illuminate\Support\Fluent;
-use Illuminate\Support\Facades\Cookie;
 
 class WargamingAuth implements WargamingAuthInterface
 {
@@ -64,6 +62,11 @@ class WargamingAuth implements WargamingAuthInterface
      * @var string
      */
     const WARGAMING_CLAN_MEMBERS_URL = 'https://api.worldoftanks.eu/wgn/clans/info/?application_id=%s&clan_id=%s&fields=members';
+
+    /**
+     * @var string
+     */
+    const WARGAMING_LOGOUT_URL = 'https://api.worldoftanks.eu/wot/auth/logout/';
 
     /**
      * Create a new WargamingAuth instance
@@ -140,6 +143,25 @@ class WargamingAuth implements WargamingAuthInterface
 
         $response = $this->guzzleClient->get(sprintf(self::WARGAMING_CLAN_MEMBERS_URL, Config::get('wargaming-auth.api_key'), $clanId));
         return current(current(json_decode($response->getBody(), true)['data']));
+    }
+
+    public function getLogout()
+    {
+        $this->loadWargamingID();
+
+        if (is_null($this->getWargamingToken())) {
+            return false;
+        }
+        $response = $this->guzzleClient->post(self::WARGAMING_LOGOUT_URL,
+            ['form_params' => ['application_id' => Config::get('wargaming-auth.api_key'), 'access_token'=>$this->getWargamingToken()]]);
+        $result = json_decode($response->getBody(), true);
+
+        if($result['status'] == "ok"){
+            app('session')->forget('wargamingId');
+            app('session')->forget('wargamingToken');
+            return true;
+        }
+        return false;
     }
 
     public function loadWargamingInfo(){
