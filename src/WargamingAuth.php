@@ -2,6 +2,7 @@
 
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\Config;
 use GuzzleHttp\Client as GuzzleClient;
 
@@ -22,7 +23,7 @@ class WargamingAuth implements WargamingAuthInterface
      * @var WargamingInfo
      */
     public $wargamingInfo = null;
-    
+
     /**
      * @var WargamingLogin
      */
@@ -189,13 +190,13 @@ class WargamingAuth implements WargamingAuthInterface
      * Parse openID reponse to fluent object
      *
      * @param  string $results wg reponse body
-     * @return Fluent
+     * @return array | Redirector
      */
     public function parseResults($results)
     {
         $results = json_decode($results, true);
         if($results['status'] == "error" && $results['error']['message'] == "INVALID_ACCESS_TOKEN"){
-            $this->redirect();
+            return $this->redirect();
         }
         $this->wargamingInfo = $results['data'][$this->wargamingId];
         return $results['data'][$this->wargamingId];
