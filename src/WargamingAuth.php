@@ -112,7 +112,7 @@ class WargamingAuth implements WargamingAuthInterface
     public function getWargamingUserInfo(){
         $this->loadWargamingID();
 
-        if (is_null($this->wargamingId) || is_null($this->wargamingToken)) {
+        if (is_null($this->getWargamingId()) || is_null($this->getWargamingToken())) {
             return false;
         }
 
@@ -194,6 +194,9 @@ class WargamingAuth implements WargamingAuthInterface
     public function parseResults($results)
     {
         $results = json_decode($results, true);
+        if($results['status'] == "error" && $results['error']['message'] == "INVALID_ACCESS_TOKEN"){
+            $this->redirect();
+        }
         $this->wargamingInfo = $results['data'][$this->wargamingId];
         return $results['data'][$this->wargamingId];
     }
