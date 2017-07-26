@@ -61,6 +61,11 @@ class WargamingAuth implements WargamingAuthInterface
     const WARGAMING_CLAN_INFO_URL = 'https://api.worldoftanks.eu/wgn/clans/membersinfo/?application_id=%s&account_id=%s';
 
     /**
+     * @var string
+     */
+    const WARGAMING_CLAN_MEMBERS_URL = 'https://api.worldoftanks.eu/wgn/clans/info/?application_id=%s&clan_id=%s&fields=members';
+
+    /**
      * Create a new WargamingAuth instance
      *
      * @param Request $request
@@ -91,6 +96,11 @@ class WargamingAuth implements WargamingAuthInterface
      */
     public function validate($parseInfo = true)
     {
+        $date = $this->getExpirateDate();
+        $now = time();
+        if(is_null($date) || $date < $now)
+            return false;
+
         $results = $this->getWargamingUserInfo();
 
         return is_array($results) && !is_null($results['private']);
@@ -118,6 +128,18 @@ class WargamingAuth implements WargamingAuthInterface
 
         $response = $this->guzzleClient->get(sprintf(self::WARGAMING_CLAN_INFO_URL, Config::get('wargaming-auth.api_key'), $this->wargamingId));
         return $this->parseResults($response->getBody());
+    }
+
+    public function getWargamingClanMembers($clanId = null)
+    {
+        $this->loadWargamingID();
+
+        if (is_null($clanId)) {
+            return false;
+        }
+
+        $response = $this->guzzleClient->get(sprintf(self::WARGAMING_CLAN_MEMBERS_URL, Config::get('wargaming-auth.api_key'), $clanId));
+        return current(current(json_decode($response->getBody(), true)['data']));
     }
 
     public function loadWargamingInfo(){
@@ -152,19 +174,6 @@ class WargamingAuth implements WargamingAuthInterface
         $results = json_decode($results, true);
         $this->wargamingInfo = $results['data'][$this->wargamingId];
         return $results['data'][$this->wargamingId];
-
-
-        $parsed = [];
-        $lines = explode("\n", $results);
-
-        foreach ($lines as $line) {
-            if (empty($line)) continue;
-
-            $line = explode(':', $line, 2);
-            $parsed[$line[0]] = $line[1];
-        }
-
-        return new Fluent($parsed);
     }
 
     /**
@@ -241,6 +250,7 @@ class WargamingAuth implements WargamingAuthInterface
         if($info['status']=="ok"){
             $this->setWargamingId($info['account_id']);
             $this->setWargamingToken($info['access_token']);
+            $this->setExpirateDate($info['expires_at']);
             $this->wargamingLogin = $info;
         }
     }
@@ -307,6 +317,28 @@ class WargamingAuth implements WargamingAuthInterface
     {
         $this->wargamingToken= $token;
         session(['wargamingToken'=>$token]);
+        return $this;
+    }
+
+
+    /**
+     * Returns the wargaming token
+     *
+     * @return bool|string
+     */
+    public function getExpirateDate()
+    {
+        return session('expirateAt', null);
+    }
+
+    /**
+     * Set the wargaming token
+     *
+     * @return WargamingAuth
+     */
+    public function setExpirateDate($date)
+    {
+        session(['expirateAt'=>$date]);
         return $this;
     }
 
