@@ -6,7 +6,16 @@ This package is a Laravel 5 service provider which provides support for Wargamin
 Add this to your `composer.json` file, in the require object:
 
 ```javascript
-"rguedes/laravel-wargaming-auth": "2.*"
+"rguedes/laravel-wargaming-auth": "dev-master"
+```
+and this:
+```javascript
+"repositories": [
+        {
+            "type":"vcs",
+            "url": "https://github.com/rguedes/laravel-wargaming-auth.git"
+        }
+]
 ```
 
 After that, run `composer install` to install the package.
